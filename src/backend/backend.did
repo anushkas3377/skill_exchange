@@ -1,0 +1,43 @@
+type Error = variant { NotFound : record { msg : text } };
+type Result = variant { Ok : SkillExchangeEntry; Err : Error };
+type SkillExchangeEntry = record {
+  id : nat64;
+  title : text;
+  updated_at : opt nat64;
+  description : text;
+  created_at : nat64;
+  user_id : nat64;
+  skills_wanted : vec text;
+  category : text;
+  skills_offered : vec text;
+  location : text;
+};
+type SkillExchangeUpdatePayload = record {
+  title : text;
+  description : text;
+  skills_wanted : vec text;
+  category : text;
+  skills_offered : vec text;
+  location : text;
+};
+service : {
+  add_skill_exchange_entry : (SkillExchangeUpdatePayload) -> (
+      opt SkillExchangeEntry,
+    );
+  delete_skill_exchange_entry : (nat64) -> (Result);
+  get_all_skill_exchange_entries : () -> (vec SkillExchangeEntry) query;
+  get_skill_exchange_entries_by_category : (text) -> (
+      vec SkillExchangeEntry,
+    ) query;
+  get_skill_exchange_entries_by_location : (text) -> (
+      vec SkillExchangeEntry,
+    ) query;
+  get_skill_exchange_entry : (nat64) -> (Result) query;
+  search_skill_exchange_entries_by_skill_offered : (text) -> (
+      vec SkillExchangeEntry,
+    ) query;
+  search_skill_exchange_entries_by_skill_wanted : (text) -> (
+      vec SkillExchangeEntry,
+    ) query;
+  update_skill_exchange_entry : (nat64, SkillExchangeUpdatePayload) -> (Result);
+}
