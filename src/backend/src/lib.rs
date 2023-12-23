@@ -9,9 +9,8 @@ use std::{borrow::Cow, cell::RefCell};
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 type IdCell = Cell<u64, Memory>;
-// ... (existing imports and types)
 
-#[derive(candid::CandidType, Clone, Serialize, Deserialize, Default)]
+#[derive(candid::CandidType, Clone, Default)]
 struct SkillExchangeEntry {
     id: u64,
     user_id: u64,
@@ -25,7 +24,6 @@ struct SkillExchangeEntry {
     updated_at: Option<u64>,
 }
 
-// Implementing Storable and BoundedStorable traits for SkillExchangeEntry
 impl Storable for SkillExchangeEntry {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
         Cow::Owned(Encode!(self).unwrap())
@@ -40,10 +38,6 @@ impl BoundedStorable for SkillExchangeEntry {
     const MAX_SIZE: u32 = 1024;
     const IS_FIXED_SIZE: bool = false;
 }
-
-// ... (existing thread-local variables and payload structure)
-
-// New thread-local variables for our Skill Exchange app
 
 thread_local! {
     static SKILL_MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> = RefCell::new(
@@ -61,12 +55,11 @@ thread_local! {
     ));
 }
 
-// Helper method to perform insert for SkillExchangeEntry
 fn do_insert_skill_exchange_entry(entry: &SkillExchangeEntry) {
     SKILL_STORAGE.with(|service| service.borrow_mut().insert(entry.id, entry.clone()));
 }
 
-#[derive(candid::CandidType, Serialize, Deserialize, Default)]
+#[derive(candid::CandidType, Default)]
 struct SkillExchangeUpdatePayload {
     title: String,
     description: String,
@@ -76,12 +69,6 @@ struct SkillExchangeUpdatePayload {
     location: String,
 }
 
-// ... (existing imports and types)
-
-// 2.7 Managing Skill Exchange Entries
-// In this section, we'll implement the core logic for managing skill exchange entries within our canister.
-
-// 2.7.1 get_skill_exchange_entry Function:
 #[ic_cdk::query]
 fn get_skill_exchange_entry(id: u64) -> Result<SkillExchangeEntry, Error> {
     match _get_skill_exchange_entry(&id) {
@@ -92,12 +79,10 @@ fn get_skill_exchange_entry(id: u64) -> Result<SkillExchangeEntry, Error> {
     }
 }
 
-// 2.7.2 _get_skill_exchange_entry Function:
 fn _get_skill_exchange_entry(id: &u64) -> Option<SkillExchangeEntry> {
     SKILL_STORAGE.with(|s| s.borrow().get(id))
 }
 
-// 2.7.3 add_skill_exchange_entry Function:
 #[ic_cdk::update]
 fn add_skill_exchange_entry(entry: SkillExchangeUpdatePayload) -> Option<SkillExchangeEntry> {
     let id = SKILL_ID_COUNTER
@@ -105,7 +90,8 @@ fn add_skill_exchange_entry(entry: SkillExchangeUpdatePayload) -> Option<SkillEx
             let current_value = *counter.borrow().get();
             counter.borrow_mut().set(current_value + 1)
         })
-        .expect("cannot increment id counter for skill exchange entries");
+        .unwrap_or_else(|| panic!("cannot increment id counter for skill exchange entries"));
+
     let timestamp = time();
     let skill_exchange_entry = SkillExchangeEntry {
         id,
@@ -118,19 +104,19 @@ fn add_skill_exchange_entry(entry: SkillExchangeUpdatePayload) -> Option<SkillEx
         location: entry.location,
         created_at: timestamp,
         updated_at: None,
-    };
+    }.unwrap_or_default();
+
     do_insert_skill_exchange_entry(&skill_exchange_entry);
     Some(skill_exchange_entry)
 }
 
-// 2.7.4 update_skill_exchange_entry Function:
 #[ic_cdk::update]
 fn update_skill_exchange_entry(
     id: u64,
     payload: SkillExchangeUpdatePayload,
 ) -> Result<SkillExchangeEntry, Error> {
-    match SKILL_STORAGE.with(|service| service.borrow().get(&id)) {
-        Some(mut skill_exchange_entry) => {
+    match SKILL_STORAGE.with(|service| service.borrow_mut().get_mut(&id)) {
+        Some(skill_exchange_entry) => {
             skill_exchange_entry.title = payload.title;
             skill_exchange_entry.description = payload.description;
             skill_exchange_entry.category = payload.category;
@@ -138,8 +124,8 @@ fn update_skill_exchange_entry(
             skill_exchange_entry.skills_wanted = payload.skills_wanted;
             skill_exchange_entry.location = payload.location;
             skill_exchange_entry.updated_at = Some(time());
-            do_insert_skill_exchange_entry(&skill_exchange_entry);
-            Ok(skill_exchange_entry)
+            do_insert_skill_exchange_entry(skill_exchange_entry);
+            Ok(skill_exchange_entry.clone())
         }
         None => Err(Error::NotFound {
             msg: format!(
@@ -150,7 +136,6 @@ fn update_skill_exchange_entry(
     }
 }
 
-// 2.7.5 delete_skill_exchange_entry Function:
 #[ic_cdk::update]
 fn delete_skill_exchange_entry(id: u64) -> Result<SkillExchangeEntry, Error> {
     match SKILL_STORAGE.with(|service| service.borrow_mut().remove(&id)) {
@@ -164,7 +149,6 @@ fn delete_skill_exchange_entry(id: u64) -> Result<SkillExchangeEntry, Error> {
     }
 }
 
-// 2.7.6 get_all_skill_exchange_entries Function:
 #[ic_cdk::query]
 fn get_all_skill_exchange_entries() -> Vec<SkillExchangeEntry> {
     SKILL_STORAGE.with(|service| {
@@ -241,11 +225,9 @@ fn get_skill_exchange_entries_by_category(category: String) -> Vec<SkillExchange
     })
 }
 
-// 2.7.7 enum Error:
 #[derive(candid::CandidType, Deserialize, Serialize)]
 enum Error {
     NotFound { msg: String },
 }
 
-// To generate the Candid interface definitions for our canister
 ic_cdk::export_candid!();
